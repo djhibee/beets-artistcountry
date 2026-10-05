@@ -17,6 +17,9 @@ class CountryPlugin(BeetsPlugin):
     def __init__(self):
         super(CountryPlugin, self).__init__()
         self.artist_country = None
+        self.config.add({
+            'additionalArtistDirs': '[]'
+        })
         self.template_fields['artist_country'] = _tmpl_country
         self.cache_file = os.path.join(config.config_dir(), 'artistcountry.json')
         self._cache = None
@@ -86,7 +89,6 @@ class CountryPlugin(BeetsPlugin):
         country = None
         # we use albumartistid instead of artist to be sure all songs from an album get the same result
         mb_albumartistid = item.get('mb_albumartistid')  
-        self._log.debug("debug1")
         cache = self.load_cache()
         
         try:  
@@ -97,7 +99,8 @@ class CountryPlugin(BeetsPlugin):
                 # Check cache first
                 if artistName and artistName in cache and cache[artistName].get('country'):
                     self._log.debug("Return artist country from cache by name")
-                    return cache[mb_albumartistid].get('country')
+                    country = cache[artistName].get('country')
+                    return country
                 country = _country_from_existing_artists(artistName)
                 # we dont necessary have mb Ids (deezer metadata) so we search them. Cons is that we often need to select manually because several results so a bit useless
                 #self._log.debug("no mbalbumartistid, search by artist name")
@@ -114,7 +117,8 @@ class CountryPlugin(BeetsPlugin):
                 # Check cache first
                 if mb_albumartistid in cache and cache[mb_albumartistid].get('country'):
                     self._log.debug("Return artist country from cache by id")
-                    return cache[mb_albumartistid].get('country')
+                    country = cache[mb_albumartistid].get('country')
+                    return country
                 # Query MusicBrainz
                 try:
                     artist_item = musicbrainzngs.get_artist_by_id(mb_albumartistid)
@@ -143,7 +147,7 @@ class CountryPlugin(BeetsPlugin):
                  }
                  self._cache = cache
                  self.save_cache()
-            return country if country else ''
+        return country if country else ''
    
 # Global plugin instance for template function access
 _plugin_instance = None	
@@ -198,33 +202,40 @@ def _has_country_iso_code(area):
     return area['type'] == "Country" and "iso-3166-1-code-list" in area
     
 def _country_from_existing_artists(name):
-	plugin = get_plugin_instance()
-	rootMusicFolder = "/volume1/Music/music/"
-	try:
-		country = ''
-		# artist directory structure is "ArtistName (XX)"
-		pattern="^"+ name + " \(([A-Z]{2})\)$"
-		print(pattern)
-		print(name)
-		for root, dirs, files in os.walk(rootMusicFolder):
-			for d in dirs:
-				x : None
-				try:
-				   x = re.search(pattern, d)
-				except Exception as e:
-				   _plugin_instance._log.debug(f"search excpetion: {e}")
-				if x:
-					country = x.group(1)
-					print("YES! We found artist country from directories! The country is %s" % country)
-					break
-			break
-	except Exception as e:
-		self._log.debug(f"Error fetching country for artist from music library: {e}")
-	finally:
-		if not country:
-			country = _country_from_user_input(name)
-		return country
+    plugin = get_plugin_instance()
+    dossiers_walk = [os.walk(config['directory'].get(str))]
+    additional_artist_dirs = self.config['additionalArtistDirs'].get(list)
+    for folder in artist_additional_folders:
+        if folder and os.path.exists(folder):
+            dossiers_walk.append(os.walk(folder))
+        
+    try:
+        country = ''
+        # Protection against compilation artists
+        if (name != "Various Artists"):
+            # artist directory structure is "ArtistName (XX)"
+            pattern = "^" + name + r" \(([A-Z]{2})\)$"
+            print(pattern)
+            print(name)
+            for root, dirs, files in itertools.chain(*parcours_dossiers):
+                for d in dirs:
+                    x : None
+                    try:
+                        x = re.search(pattern, d)
+                    except Exception as e:
+                        _plugin_instance._log.debug(f"search excpetion: {e}")
+                    if x:
+                        country = x.group(1)
+                        print("YES! We found artist country from directories! The country is %s" % country)
+                        break
+                break
+    except Exception as e:
+        self._log.debug(f"Error fetching country for artist from music library: {e}")
+    finally:
+        if not country and ( name != "Various Artists"):
+            country = _country_from_user_input(name)
+    return country
 	
 def _country_from_user_input(name):
-	country = input(f"Enter country for artist {name} (not found in musicbrainz nor music library):")
-	return country
+    country = input(f"Enter country for artist {name} (not found in musicbrainz nor music library):")
+    return country
