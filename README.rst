@@ -33,6 +33,7 @@ implement a two-tier caching system to minimize MusicBrainz API calls:
 - Each artist is queried from MusicBrainz at most once
 
 - Add `beet artistcountry` command to populate missing fields
+- Use `beet artistcountry --pretend` (or `-n`) to preview resolved updates without saving them; query arguments still apply, e.g. `beet artistcountry --pretend Metallica`
 - Template field computes on-demand, command persists to database
 
 Architecture:
