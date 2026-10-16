@@ -37,19 +37,31 @@ class CountryPlugin(BeetsPlugin):
             for item in items:
                 # Check if artist_country is already set in flexible attributes
                 if not item._values_flex.get('artist_country'):
-                    country = self.get_artist_country(item)
+                    country = self.get_artist_country(item, pretend=opts.pretend)
                     if country:
-                        item['artist_country'] = country
-                        item.store()
+                        if opts.pretend:
+                            self._log.info(
+                                f'Would set artist_country={country} for {item.artist} - {item.title}'
+                            )
+                        else:
+                            item['artist_country'] = country
+                            item.store()
                         updated += 1
-                        self._log.debug(f'Set artist_country={country} for {item.artist} - {item.title}')
+                        if not opts.pretend:
+                            self._log.debug(f'Set artist_country={country} for {item.artist} - {item.title}')
                 else:
                     country = item['artist_country']
                     self._log.debug(f'Artist country already set as flex value: {country}')
 
-            self._log.info(f'Updated {updated} items with artist_country')
+            if opts.pretend:
+                self._log.info(f'Would update {updated} items with artist_country')
+            else:
+                self._log.info(f'Updated {updated} items with artist_country')
 
         artistcountry_cmd = ui.Subcommand('artistcountry', help='populate artist_country fields')
+        artistcountry_cmd.parser.add_option(
+            '-n', '--pretend', action='store_true', help='show what would be updated without saving'
+        )
         artistcountry_cmd.func = artistcountry_func
         return [artistcountry_cmd]
     
@@ -83,7 +95,7 @@ class CountryPlugin(BeetsPlugin):
         except IOError as e:
             self._log.warning(f'Error saving artist country cache: {e}')
         
-    def get_artist_country(self, item):
+    def get_artist_country(self, item, pretend=False):
         item_types = {'country': types.STRING}
         artistName = item.get('albumartist')
         country = None
@@ -138,15 +150,16 @@ class CountryPlugin(BeetsPlugin):
                  # Try to find artist country from library path if not already done
                  country = _country_from_existing_artists(artistName)
             if country:
-                 country = country.upper()
-                 # Cache the result if not empty
-                 cache[mb_albumartistid] = {
-                    'country': country,
-                    'cached': datetime.now().isoformat(),
-                    'name': artistName
-                 }
-                 self._cache = cache
-                 self.save_cache()
+                country = country.upper()
+                if not pretend:
+                    # Cache the result if not empty
+                    cache[mb_albumartistid] = {
+                        'country': country,
+                        'cached': datetime.now().isoformat(),
+                        'name': artistName
+                    }
+                    self._cache = cache
+                    self.save_cache()
         return country if country else ''
    
 # Global plugin instance for template function access
