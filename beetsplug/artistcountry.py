@@ -18,7 +18,7 @@ class CountryPlugin(BeetsPlugin):
         super(CountryPlugin, self).__init__()
         self.artist_country = None
         self.config.add({
-            'additionalArtistDirs': '[]'
+            'additionalArtistDirs': []
         })
         self.template_fields['artist_country'] = _tmpl_country
         self.cache_file = os.path.join(config.config_dir(), 'artistcountry.json')
@@ -195,7 +195,7 @@ def _country_from_area(area):
 
 
 def _find_top_area(area):
-    new_area = get_area_by_id(area['id'], includes=['area-rels'])
+    new_area = musicbrainzngs.get_area_by_id(area['id'], includes=['area-rels'])
     new_area = [
         a['area'] for a in new_area['area']['area-relation-list']
         if a.get('direction', '') == 'backward'
@@ -216,36 +216,36 @@ def _has_country_iso_code(area):
     
 def _country_from_existing_artists(name):
     plugin = get_plugin_instance()
-    dossiers_walk = [os.walk(config['directory'].get(str))]
-    additional_artist_dirs = self.config['additionalArtistDirs'].get(list)
-    for folder in artist_additional_folders:
-        if folder and os.path.exists(folder):
-            dossiers_walk.append(os.walk(folder))
-        
+    country = ''
+    if not name:
+        return country
     try:
-        country = ''
+        folders = [config['directory'].as_filename()]
+        additional_artist_dirs = plugin.config['additionalArtistDirs'].get()
+        if isinstance(additional_artist_dirs, str):
+            additional_artist_dirs = [additional_artist_dirs]
+        folders.extend(additional_artist_dirs or [])
+
         # Protection against compilation artists
-        if (name != "Various Artists"):
+        if name != "Various Artists":
             # artist directory structure is "ArtistName (XX)"
-            pattern = "^" + name + r" \(([A-Z]{2})\)$"
-            print(pattern)
-            print(name)
-            for root, dirs, files in itertools.chain(*parcours_dossiers):
-                for d in dirs:
-                    x : None
-                    try:
-                        x = re.search(pattern, d)
-                    except Exception as e:
-                        _plugin_instance._log.debug(f"search excpetion: {e}")
+            pattern = re.compile("^" + re.escape(name) + r" \(([A-Z]{2})\)$")
+            for folder in folders:
+                if not folder or not os.path.isdir(folder):
+                    continue
+                # only look at the top level directories of each folder
+                for d in next(os.walk(folder), (None, [], []))[1]:
+                    x = pattern.search(d)
                     if x:
                         country = x.group(1)
-                        print("YES! We found artist country from directories! The country is %s" % country)
+                        plugin._log.debug(f"Found artist country {country} from directory {os.path.join(folder, d)}")
                         break
-                break
+                if country:
+                    break
     except Exception as e:
-        self._log.debug(f"Error fetching country for artist from music library: {e}")
+        plugin._log.debug(f"Error fetching country for artist from music library: {e}")
     finally:
-        if not country and ( name != "Various Artists"):
+        if not country and name != "Various Artists":
             country = _country_from_user_input(name)
     return country
 	
