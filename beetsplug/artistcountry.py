@@ -100,7 +100,11 @@ class CountryPlugin(BeetsPlugin):
         artistName = item.get('albumartist')
         country = None
         # we use albumartistid instead of artist to be sure all songs from an album get the same result
-        mb_albumartistid = item.get('mb_albumartistid')  
+        mb_albumartistid = item.get('mb_albumartistid')
+        # for compilations the album artist is "Various Artists", so use the track artist instead
+        if item.get('comp') or not artistName or _is_various_artists(artistName, mb_albumartistid):
+            artistName = item.get('artist') or artistName
+            mb_albumartistid = item.get('mb_artistid')
         cache = self.load_cache()
         
         try:  
@@ -189,6 +193,18 @@ def _tmpl_country(item):
 
     return country
 
+VARIOUS_ARTISTS_MBID = '89ad4ac3-39f7-470e-963a-56509c546377'
+
+def _is_various_artists(name, mbid=None):
+    if mbid == VARIOUS_ARTISTS_MBID:
+        return True
+    va_names = {'various artists'}
+    try:
+        va_names.add(config['va_name'].as_str().lower())
+    except Exception:
+        pass
+    return bool(name) and name.lower() in va_names
+
 def _country_from_area(area):
     countries = _find_top_area(area)
     return countries[0]
@@ -227,7 +243,7 @@ def _country_from_existing_artists(name):
         folders.extend(additional_artist_dirs or [])
 
         # Protection against compilation artists
-        if name != "Various Artists":
+        if not _is_various_artists(name):
             # artist directory structure is "ArtistName (XX)"
             pattern = re.compile("^" + re.escape(name) + r" \(([A-Z]{2})\)$")
             for folder in folders:
@@ -245,7 +261,7 @@ def _country_from_existing_artists(name):
     except Exception as e:
         plugin._log.debug(f"Error fetching country for artist from music library: {e}")
     finally:
-        if not country and name != "Various Artists":
+        if not country and not _is_various_artists(name):
             country = _country_from_user_input(name)
     return country
 	

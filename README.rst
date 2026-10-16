@@ -31,6 +31,7 @@ implement a two-tier caching system to minimize MusicBrainz API calls:
 - JSON cache (~/.config/beets/artistcountry.json) stores per-artist results
 - Flexible attributes store per-item results in beets database
 - Each artist is queried from MusicBrainz at most once
+- Country is resolved from the album artist; for compilations (``comp``, or album artist "Various Artists" / ``va_name``) the track artist is used instead
 
 - Add `beet artistcountry` command to populate missing fields
 - Use `beet artistcountry --pretend` (or `-n`) to preview resolved updates without saving them; query arguments still apply, e.g. `beet artistcountry --pretend Metallica`
